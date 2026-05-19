@@ -1,0 +1,861 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ESP32 DHT11 Dashboard</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --primary: #8b5cf6;
+            --primary-hover: #7c3aed;
+            --secondary: #10b981;
+            --bg-color: #0f172a;
+            --card-bg: rgba(30, 41, 59, 0.7);
+            --card-border: rgba(255, 255, 255, 0.1);
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --danger: #ef4444;
+            --success: #10b981;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Outfit', sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            min-height: 100vh;
+            padding: 20px;
+            position: relative;
+            overflow-x: hidden;
+        }
+
+        /* Ambient Background Glows */
+        .bg-glow {
+            position: fixed;
+            border-radius: 50%;
+            filter: blur(100px);
+            z-index: -1;
+            animation: float 10s ease-in-out infinite alternate;
+        }
+
+        .glow-1 {
+            width: 400px;
+            height: 400px;
+            background: rgba(139, 92, 246, 0.15);
+            top: -100px;
+            left: -100px;
+        }
+
+        .glow-2 {
+            width: 500px;
+            height: 500px;
+            background: rgba(16, 185, 129, 0.1);
+            bottom: -150px;
+            right: -100px;
+            animation-delay: -5s;
+        }
+
+        @keyframes float {
+            0% {
+                transform: translateY(0) scale(1);
+            }
+
+            100% {
+                transform: translateY(30px) scale(1.1);
+            }
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            position: relative;
+            z-index: 1;
+        }
+
+        h1 {
+            text-align: center;
+            margin-bottom: 40px;
+            font-size: 3em;
+            font-weight: 700;
+            background: linear-gradient(135deg, #fff, #94a3b8);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            letter-spacing: -1px;
+            text-transform: uppercase;
+        }
+
+        .glass-panel {
+            background: var(--card-bg);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid var(--card-border);
+            border-radius: 24px;
+            padding: 30px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            transition: all 0.3s ease;
+        }
+
+        .config-panel {
+            margin-bottom: 30px;
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .config-panel h3 {
+            margin-bottom: 20px;
+            color: var(--text-main);
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 1.5rem;
+        }
+
+        .input-group {
+            position: relative;
+            margin-bottom: 15px;
+        }
+
+        .config-panel input {
+            width: 100%;
+            padding: 15px 20px;
+            background: rgba(15, 23, 42, 0.6);
+            border: 1px solid var(--card-border);
+            border-radius: 12px;
+            color: white;
+            font-size: 16px;
+            transition: all 0.3s ease;
+            outline: none;
+        }
+
+        .config-panel input:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 2px rgba(139, 92, 246, 0.2);
+        }
+
+        .btn {
+            background: linear-gradient(135deg, var(--primary), #a855f7);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 12px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            width: 100%;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            box-shadow: 0 10px 20px -10px rgba(139, 92, 246, 0.5);
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 15px 25px -10px rgba(139, 92, 246, 0.6);
+            filter: brightness(1.1);
+        }
+
+        .btn-outline {
+            background: transparent;
+            border: 1px solid var(--primary);
+            color: var(--primary);
+            box-shadow: none;
+        }
+
+        .btn-outline:hover {
+            background: rgba(139, 92, 246, 0.1);
+            transform: translateY(-2px);
+        }
+
+        .status {
+            text-align: center;
+            padding: 15px;
+            border-radius: 12px;
+            margin-top: 15px;
+            font-weight: 500;
+            font-size: 14px;
+            transition: all 0.3s ease;
+            opacity: 0;
+            transform: translateY(-10px);
+            display: none;
+        }
+
+        .status.show {
+            opacity: 1;
+            transform: translateY(0);
+            display: block;
+        }
+
+        .status.connected {
+            background: rgba(16, 185, 129, 0.1);
+            color: var(--success);
+            border: 1px solid rgba(16, 185, 129, 0.2);
+        }
+
+        .status.error {
+            background: rgba(239, 68, 68, 0.1);
+            color: var(--danger);
+            border: 1px solid rgba(239, 68, 68, 0.2);
+        }
+
+        .cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 25px;
+            margin-bottom: 30px;
+        }
+
+        .metric-card {
+            background: var(--card-bg);
+            backdrop-filter: blur(16px);
+            border: 1px solid var(--card-border);
+            border-radius: 24px;
+            padding: 30px 25px;
+            position: relative;
+            overflow: hidden;
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .metric-card:hover {
+            transform: translateY(-5px);
+            border-color: rgba(255, 255, 255, 0.2);
+        }
+
+        .metric-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 4px;
+            background: linear-gradient(90deg, var(--primary), var(--secondary));
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .metric-card:hover::before {
+            opacity: 1;
+        }
+
+        .card-icon {
+            font-size: 40px;
+            position: absolute;
+            top: 25px;
+            right: 25px;
+            opacity: 0.1;
+        }
+
+        .card-title {
+            font-size: 13px;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            margin-bottom: 15px;
+            font-weight: 600;
+        }
+
+        .card-value-wrapper {
+            display: flex;
+            align-items: baseline;
+            gap: 5px;
+        }
+
+        .card-value {
+            font-size: 3.5em;
+            font-weight: 700;
+            background: linear-gradient(135deg, #fff, #cbd5e1);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            line-height: 1;
+        }
+
+        .temp-color .card-value {
+            background: linear-gradient(135deg, #f87171, #fca5a5);
+            -webkit-background-clip: text;
+            background-clip: text;
+        }
+
+        .hum-color .card-value {
+            background: linear-gradient(135deg, #60a5fa, #93c5fd);
+            -webkit-background-clip: text;
+            background-clip: text;
+        }
+
+        .card-unit {
+            font-size: 1.2em;
+            color: var(--text-muted);
+            font-weight: 500;
+        }
+
+        .card-subtitle {
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-top: 15px;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .chart-container {
+            margin-bottom: 25px;
+            position: relative;
+        }
+
+        .chart-container h3 {
+            margin-bottom: 25px;
+            font-weight: 500;
+            font-size: 1.2rem;
+            color: var(--text-main);
+        }
+
+        canvas {
+            min-height: 350px;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--text-muted);
+            font-size: 1.2em;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .loader {
+            width: 50px;
+            height: 50px;
+            border: 3px solid rgba(139, 92, 246, 0.3);
+            border-radius: 50%;
+            border-top-color: var(--primary);
+            animation: spin 1s ease-in-out infinite;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        .dashboard-footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px 0;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+
+        .last-update {
+            color: var(--text-muted);
+            font-size: 0.9em;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .pulse {
+            width: 8px;
+            height: 8px;
+            background-color: var(--success);
+            border-radius: 50%;
+            box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+            animation: pulse-ring 2s infinite;
+        }
+
+        @keyframes pulse-ring {
+            0% {
+                box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+            }
+
+            70% {
+                box-shadow: 0 0 0 10px rgba(16, 185, 129, 0);
+            }
+
+            100% {
+                box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
+            }
+        }
+
+        .refresh-btn {
+            width: auto;
+            padding: 10px 20px;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            h1 {
+                font-size: 2em;
+            }
+
+            .cards {
+                grid-template-columns: 1fr;
+            }
+
+            .dashboard-footer {
+                justify-content: center;
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="bg-glow glow-1"></div>
+    <div class="bg-glow glow-2"></div>
+
+    <div class="container">
+        <h1>Dashboard<span style="color: var(--primary);">.</span></h1>
+
+        <!-- Configuration Panel -->
+        <div class="glass-panel config-panel" id="configSection">
+            <h3>⚙️ Database Connection</h3>
+            <div class="input-group">
+                <input type="text" id="supabaseUrl" placeholder="Supabase URL (https://xxx.supabase.co)">
+            </div>
+            <div class="input-group">
+                <input type="password" id="supabaseKey" placeholder="Supabase Anon Key">
+            </div>
+            <button class="btn" onclick="saveConfig()">Connect to Database</button>
+            <div class="btn btn-outline" style="margin-top: 15px; text-align: center; display: none;" id="hideConfigBtn"
+                onclick="toggleConfig(false)">Close Panel</div>
+            <div id="configStatus" class="status"></div>
+        </div>
+
+        <!-- Toggle Config Button (visible when connected) -->
+        <div style="text-align: right; margin-bottom: 20px; display: none;" id="showConfigWrapper">
+            <button class="btn btn-outline" style="width: auto; padding: 10px 20px; font-size: 14px;"
+                onclick="toggleConfig(true)">⚙️ Settings</button>
+        </div>
+
+        <div id="dashboard" style="display: none;">
+            <!-- Current Readings -->
+            <div class="cards">
+                <div class="metric-card temp-color">
+                    <span class="card-icon">🌡️</span>
+                    <div class="card-title">Temperature</div>
+                    <div class="card-value-wrapper">
+                        <div class="card-value" id="currentTemp">--</div>
+                        <div class="card-unit">°C</div>
+                    </div>
+                    <div class="card-subtitle">
+                        <span>🕒</span> <span id="tempTime">--</span>
+                    </div>
+                </div>
+
+                <div class="metric-card hum-color">
+                    <span class="card-icon">💧</span>
+                    <div class="card-title">Humidity</div>
+                    <div class="card-value-wrapper">
+                        <div class="card-value" id="currentHumidity">--</div>
+                        <div class="card-unit">%</div>
+                    </div>
+                    <div class="card-subtitle">
+                        <span>🕒</span> <span id="humidityTime">--</span>
+                    </div>
+                </div>
+
+                <div class="metric-card">
+                    <span class="card-icon">📊</span>
+                    <div class="card-title">Avg Temp (24h)</div>
+                    <div class="card-value-wrapper">
+                        <div class="card-value" id="avgTemp">--</div>
+                        <div class="card-unit">°C</div>
+                    </div>
+                    <div class="card-subtitle">
+                        <span>📈</span> Daily Insight
+                    </div>
+                </div>
+
+                <div class="metric-card">
+                    <span class="card-icon">📈</span>
+                    <div class="card-title">Avg Humidity (24h)</div>
+                    <div class="card-value-wrapper">
+                        <div class="card-value" id="avgHumidity">--</div>
+                        <div class="card-unit">%</div>
+                    </div>
+                    <div class="card-subtitle">
+                        <span>💧</span> Daily Insight
+                    </div>
+                </div>
+            </div>
+
+            <!-- Charts -->
+            <div class="glass-panel chart-container">
+                <h3>Analytics Overview <span
+                        style="font-size: 14px; color: var(--text-muted); font-weight: 400; margin-left: 10px;">(Last 24
+                        Hours)</span></h3>
+                <canvas id="mainChart"></canvas>
+            </div>
+
+            <div class="dashboard-footer">
+                <div class="last-update">
+                    <div class="pulse" id="liveIndicator"></div>
+                    <span id="lastUpdate">Live tracking active</span>
+                </div>
+                <button class="btn btn-outline refresh-btn" onclick="fetchData()">
+                    🔄 Sync Now
+                </button>
+            </div>
+        </div>
+
+        <div id="loading" class="loading">
+            <div class="loader" id="loaderSpinner" style="display: none;"></div>
+            <span id="loadingText">Waiting for database configuration...</span>
+        </div>
+    </div>
+
+    <script>
+        let supabaseUrl = localStorage.getItem('supabaseUrl') || '';
+        let supabaseKey = localStorage.getItem('supabaseKey') || '';
+        let chart = null;
+
+        // Customize Chart.js Defaults
+        Chart.defaults.color = '#94a3b8';
+        Chart.defaults.font.family = "'Outfit', sans-serif";
+
+        // Load saved config on page load
+        window.onload = function () {
+            if (supabaseUrl && supabaseKey) {
+                document.getElementById('supabaseUrl').value = supabaseUrl;
+                document.getElementById('supabaseKey').value = supabaseKey;
+
+                // Show loader while initial fetch happens
+                document.getElementById('loadingText').textContent = 'Connecting to database...';
+                document.getElementById('loaderSpinner').style.display = 'block';
+                document.getElementById('configSection').style.display = 'none';
+
+                fetchData().then(success => {
+                    if (success) {
+                        showDashboard();
+                    } else {
+                        // Show config again if failed
+                        toggleConfig(true);
+                        document.getElementById('loading').style.display = 'block';
+                        document.getElementById('loadingText').textContent = 'Connection failed. Please check credentials.';
+                        document.getElementById('loaderSpinner').style.display = 'none';
+                    }
+                });
+                // Auto-refresh every 30 seconds
+                setInterval(fetchData, 30000);
+            }
+        };
+
+        function toggleConfig(show) {
+            const configSection = document.getElementById('configSection');
+            const showBtn = document.getElementById('showConfigWrapper');
+            const hideBtn = document.getElementById('hideConfigBtn');
+
+            if (show) {
+                configSection.style.display = 'block';
+                showBtn.style.display = 'none';
+                hideBtn.style.display = supabaseUrl ? 'block' : 'none';
+            } else {
+                configSection.style.display = 'none';
+                showBtn.style.display = 'block';
+            }
+        }
+
+        async function saveConfig() {
+            supabaseUrl = document.getElementById('supabaseUrl').value.trim();
+            supabaseKey = document.getElementById('supabaseKey').value.trim();
+
+            if (!supabaseUrl || !supabaseKey) {
+                showStatus('Please enter both URL and Key', false);
+                return;
+            }
+
+            // Save to localStorage
+            localStorage.setItem('supabaseUrl', supabaseUrl);
+            localStorage.setItem('supabaseKey', supabaseKey);
+
+            showStatus('Connecting to database...', true);
+
+            const btn = document.querySelector('.config-panel .btn');
+            const originalText = btn.textContent;
+            btn.textContent = 'Connecting...';
+            btn.disabled = true;
+
+            // Test connection
+            const success = await fetchData();
+            btn.textContent = originalText;
+            btn.disabled = false;
+
+            if (success) {
+                showStatus('✓ Connected successfully!', true);
+                setTimeout(() => {
+                    toggleConfig(false);
+                    showDashboard();
+                }, 1000);
+            } else {
+                showStatus('✗ Connection failed. Check your credentials.', false);
+            }
+        }
+
+        function showStatus(message, isSuccess) {
+            const statusDiv = document.getElementById('configStatus');
+            statusDiv.textContent = message;
+            statusDiv.className = 'status show ' + (isSuccess ? 'connected' : 'error');
+        }
+
+        function showDashboard() {
+            document.getElementById('dashboard').style.display = 'block';
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('showConfigWrapper').style.display = 'block';
+            document.getElementById('configSection').style.display = 'none';
+        }
+
+        async function fetchData() {
+            if (!supabaseUrl || !supabaseKey) return false;
+
+            try {
+                // Pulse indicator
+                const indicator = document.getElementById('liveIndicator');
+                if (indicator) indicator.style.backgroundColor = '#fbbf24'; // Yellow whilst fetching
+
+                // Fetch last 100 readings (last 24h if reading every minute)
+                const response = await fetch(
+                    `${supabaseUrl}/rest/v1/sensor_data?order=created_at.desc&limit=100`,
+                    {
+                        headers: {
+                            'apikey': supabaseKey,
+                            'Authorization': `Bearer ${supabaseKey}`
+                        }
+                    }
+                );
+
+                if (indicator) indicator.style.backgroundColor = '#10b981'; // Back to green
+
+                if (!response.ok) {
+                    throw new Error('Failed to fetch data');
+                }
+
+                const data = await response.json();
+
+                if (data.length === 0) {
+                    console.log('No data yet');
+                    return false;
+                }
+
+                updateDashboard(data);
+                return true;
+
+            } catch (error) {
+                console.error('Error fetching data:', error);
+                const indicator = document.getElementById('liveIndicator');
+                if (indicator) indicator.style.backgroundColor = '#ef4444'; // Red on error
+                return false;
+            }
+        }
+
+        function updateDashboard(data) {
+            // Latest reading
+            const latest = data[0];
+
+            // Format numbers nicely or -- if null
+            document.getElementById('currentTemp').textContent = latest.temperature != null ? Number(latest.temperature).toFixed(1) : '--';
+            document.getElementById('currentHumidity').textContent = latest.humidity != null ? Number(latest.humidity).toFixed(1) : '--';
+
+            const latestTime = new Date(latest.created_at);
+            const timeOptions = { hour: 'numeric', minute: '2-digit', hour12: true };
+            const timeStr = latestTime.toLocaleTimeString([], timeOptions);
+
+            document.getElementById('tempTime').textContent = timeStr;
+            document.getElementById('humidityTime').textContent = timeStr;
+
+            // Calculate averages for last 24 hours
+            const now = new Date();
+            const last24h = data.filter(reading => {
+                const readingTime = new Date(reading.created_at);
+                return (now - readingTime) <= 24 * 60 * 60 * 1000;
+            });
+
+            if (last24h.length > 0) {
+                const validTemps = last24h.filter(r => r.temperature != null).map(r => Number(r.temperature));
+                const validHums = last24h.filter(r => r.humidity != null).map(r => Number(r.humidity));
+
+                if (validTemps.length > 0) {
+                    const avgTemp = validTemps.reduce((a, b) => a + b, 0) / validTemps.length;
+                    document.getElementById('avgTemp').textContent = avgTemp.toFixed(1);
+                }
+
+                if (validHums.length > 0) {
+                    const avgHum = validHums.reduce((a, b) => a + b, 0) / validHums.length;
+                    document.getElementById('avgHumidity').textContent = avgHum.toFixed(1);
+                }
+            }
+
+            // Update chart
+            updateChart([...data].reverse()); // Reverse to show oldest first without mutating original
+
+            // Update last update time
+            document.getElementById('lastUpdate').textContent = `Last synchronized: ${new Date().toLocaleTimeString()}`;
+        }
+
+        function updateChart(data) {
+            const labels = data.map(d => {
+                const date = new Date(d.created_at);
+                return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+            });
+
+            const tempData = data.map(d => d.temperature != null ? Number(d.temperature) : null);
+            const humData = data.map(d => d.humidity != null ? Number(d.humidity) : null);
+
+            if (chart) {
+                chart.destroy();
+            }
+
+            const ctx = document.getElementById('mainChart').getContext('2d');
+
+            // Gradient for Temperature
+            const tempGradient = ctx.createLinearGradient(0, 0, 0, 400);
+            tempGradient.addColorStop(0, 'rgba(248, 113, 113, 0.5)');
+            tempGradient.addColorStop(1, 'rgba(248, 113, 113, 0.0)');
+
+            // Gradient for Humidity
+            const humGradient = ctx.createLinearGradient(0, 0, 0, 400);
+            humGradient.addColorStop(0, 'rgba(96, 165, 250, 0.5)');
+            humGradient.addColorStop(1, 'rgba(96, 165, 250, 0.0)');
+
+            chart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: 'Temperature (°C)',
+                            data: tempData,
+                            borderColor: '#f87171',
+                            backgroundColor: tempGradient,
+                            borderWidth: 2,
+                            tension: 0.4,
+                            fill: true,
+                            yAxisID: 'y',
+                            pointRadius: 0,
+                            pointHitRadius: 10,
+                            pointHoverRadius: 5
+                        },
+                        {
+                            label: 'Humidity (%)',
+                            data: humData,
+                            borderColor: '#60a5fa',
+                            backgroundColor: humGradient,
+                            borderWidth: 2,
+                            tension: 0.4,
+                            fill: true,
+                            yAxisID: 'y1',
+                            pointRadius: 0,
+                            pointHitRadius: 10,
+                            pointHoverRadius: 5
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: {
+                        mode: 'index',
+                        intersect: false,
+                    },
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                            labels: {
+                                usePointStyle: true,
+                                padding: 20,
+                                font: {
+                                    family: "'Outfit', sans-serif",
+                                    size: 13
+                                }
+                            }
+                        },
+                        tooltip: {
+                            backgroundColor: 'rgba(15, 23, 42, 0.9)',
+                            titleFont: {
+                                family: "'Outfit', sans-serif",
+                                size: 14,
+                                weight: 'bold'
+                            },
+                            bodyFont: {
+                                family: "'Outfit', sans-serif",
+                                size: 13
+                            },
+                            padding: 12,
+                            cornerRadius: 8,
+                            borderColor: 'rgba(255, 255, 255, 0.1)',
+                            borderWidth: 1
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: {
+                                color: 'rgba(255, 255, 255, 0.05)',
+                                drawBorder: false
+                            },
+                            ticks: {
+                                maxTicksLimit: 8
+                            }
+                        },
+                        y: {
+                            type: 'linear',
+                            display: true,
+                            position: 'left',
+                            title: {
+                                display: true,
+                                text: 'Temperature (°C)',
+                                color: '#f87171',
+                                font: {
+                                    family: "'Outfit', sans-serif",
+                                    size: 12
+                                }
+                            },
+                            grid: {
+                                color: 'rgba(255, 255, 255, 0.05)',
+                                drawBorder: false
+                            }
+                        },
+                        y1: {
+                            type: 'linear',
+                            display: true,
+                            position: 'right',
+                            title: {
+                                display: true,
+                                text: 'Humidity (%)',
+                                color: '#60a5fa',
+                                font: {
+                                    family: "'Outfit', sans-serif",
+                                    size: 12
+                                }
+                            },
+                            grid: {
+                                drawOnChartArea: false,
+                            },
+                        },
+                    }
+                }
+            });
+        }
+    </script>
+</body>
+
+</html>
