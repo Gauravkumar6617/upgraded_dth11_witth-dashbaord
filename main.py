@@ -11,8 +11,8 @@ import ujson
 # ─────────────────────────────────────────
 WIFI_SSID         = "Galaxy Tab A9 2252"
 WIFI_PASSWORD     = "12345678"
-SUPABASE_URL      = "https://tnlkcenrbcbzxwyvbdjo.supabase.co"
-SUPABASE_KEY      = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRubGtjZW5yYmNienh3eXZiZGpvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkxMjA0MDgsImV4cCI6MjA5NDY5NjQwOH0.MrBg_h4OuxlD3Hw7XhPNnO-24t4tUHX6UHwN6MO6JcI"
+SUPABASE_URL      = ""
+SUPABASE_KEY      = ""
 DHT_PIN           = 4       # GPIO pin connected to DHT11 data pin
 READING_INTERVAL  = 60      # seconds between readings
 SENSOR_RETRIES    = 3       # how many times to retry a bad sensor read
